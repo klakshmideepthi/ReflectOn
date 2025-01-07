@@ -1,0 +1,101 @@
+# LLM Coding Guidelines - General Instructions
+
+**Technology Stack:** SwiftUI, Firebase (Authentication, Firestore, Cloud Functions, App Check, Secret Manager, Crashlytics, Cloud Messaging), OpenAI API (Realtime, Whisper, GPT-4o or similar)
+
+**File Read Time:** Read these guidelines **before** generating any code.
+
+## Core Principles - Keep it Simple
+
+1.  **Simplicity Over Cleverness:** Prioritize clear, easily understandable code. Avoid complex solutions unless absolutely necessary. Readability is paramount.
+2.  **Focus on Core Functionality:** Build the minimum viable solution first. Add features incrementally based on actual needs, not assumptions.
+3.  **Leverage Existing Solutions:** Use standard Swift libraries, SwiftUI components, and relevant SDKs whenever possible. Avoid reinventing the wheel. Choose well-maintained, popular libraries when external dependencies are needed.
+4.  **Single Responsibility:** Each function, struct, class, and file should have one clear purpose.
+5.  **Concise Code:** Keep functions and methods short (ideally under 20 lines). Extract complex logic into smaller, well-named helper functions.
+6.  **Meaningful Names:** Use descriptive names for variables, functions, classes, and files that clearly indicate their purpose. Avoid unnecessary abbreviations.
+7.  **Consistent Formatting:** Follow standard Swift formatting conventions. Use 4 spaces for indentation. Add spacing between logical sections in each file.
+8.  **Explicit Error Handling:** Handle potential errors explicitly. Validate inputs and provide meaningful error messages. Use `do-catch` blocks appropriately.
+9. **Flat & Readable:**
+    - Avoid deep nesting of conditionals.
+    - Break code into smaller functions if it becomes too nested or lengthy.
+
+## SwiftUI Specific Guidelines
+
+1.  **Declarative UI:** Embrace SwiftUI's declarative approach. Define UI structure and behavior clearly using state and data flow.
+2.  **Small, Reusable Views:** Break down complex views into smaller, reusable components. Each component should have a single responsibility.
+3.  **State and Data Flow:** Use `@State`, `@ObservedObject`, `@StateObject`, `@EnvironmentObject` and `@Environment` appropriately to manage the view's state and data flow. Clearly define the source of truth for each piece of data.
+4.  **View Models:** Use the `@ObservableObject` protocol to create view models that encapsulate view-specific logic and data. Keep views focused on rendering and user interaction. Avoid storing large amounts of logic in SwiftUI views.
+5.  **Efficient Updates:** Optimize view updates by using `EquatableView` where appropriate and ensuring that only necessary parts of the view hierarchy are redrawn when data changes.
+
+## Firebase Specific Guidelines
+
+1.  **Asynchronous Operations:** Use async/await for all Firebase interactions. Handle loading and error states gracefully.
+2.  **Security Rules:** Adhere to the defined Firestore security rules (you will be provided with these). Ensure that data access is properly restricted based on user ownership.
+3.  **Cloud Functions:** Use Cloud Functions for server-side logic, especially for tasks that require elevated privileges or interact with external APIs.
+
+## OpenAI API Specific Guidelines
+
+1.  **Ephemeral Keys:** If applicable to the project, use a mechanism to obtain short-lived, limited-scope API keys for client-side access to the OpenAI Realtime API.
+2.  **Realtime API Interaction:** If using the Realtime API, follow the specified protocol for interacting with it via WebRTC. Handle client events (sending initial instructions, wrap-up/end signals) and server events (real-time text display) correctly.
+3.  **Prompt Engineering:** You will be provided with detailed prompt structures for different parts of the project. Refine these prompts as needed during development.
+4.  **Error Handling:** Implement robust error handling for all OpenAI API interactions. Handle rate limits, network errors, and API errors gracefully. Provide informative error messages to the user when appropriate.
+
+## Code Structure and Organization
+
+1.  **Group by Feature:** Organize code by feature, not by type. For example, all code related to a specific feature should be grouped together (views, view models, models, services, etc.).
+2.  **Consistent File Naming:** Use PascalCase for Swift files (e.g., `UserProfileView.swift`).
+3.  **Project Structure:** Maintain a clear and consistent project structure.
+
+## Object-Oriented Programming (OOP)
+
+1.  **Single Responsibility Principle:** Each class should have only one specific responsibility.
+2.  **Encapsulation:** Hide internal implementation details. Use access control (private, fileprivate, internal, public) appropriately.
+3.  **Clear Initialization:** Initialize all properties in the initializer (`init`).
+4.  **Composition Over Inheritance:** Favor composition to build complex objects from simpler ones.
+5.  **Explicit Dependencies:** Use dependency injection to make dependencies clear. Pass dependencies through initializers.
+
+## Function & Method Design
+
+1.  **Single Responsibility:** Each function or method handles one concern.
+2.  **Limit Parameters:** Keep parameter lists short (3 or fewer is ideal). Consider grouping related parameters into a struct/class or dictionary if it clarifies usage.
+3.  **Error Handling:** Handle potential errors explicitly. Validate inputs. Return or throw meaningful errors instead of silent failures.
+4.  **Short & Focused:** Prefer smaller functions (often < 20 lines). If it feels too big, break it down.
+
+## Documentation
+
+1.  **Code Comments:** Only add comments when explaining complex logic or the "why" behind a particular decision. Do not simply restate what the code already expresses.
+2.  **Docstrings:**  Avoid adding docstrings unless absolutely necessary.
+3.  **External Documentation:** You will be provided with external documentation if needed. Refer to them for detailed information about the app's features, architecture, and implementation.
+
+## Testing
+
+1.  **Unit Tests:** Write unit tests for individual components (models, view models, services, etc.). Focus on testing public interfaces and edge cases.
+2.  **UI Tests:** Write UI tests to verify user flows and interactions.
+3.  **Test-Driven Development (TDD):** Consider using TDD, writing tests *before* implementing the code.
+
+## Debugging
+
+1.  **Understand the Symptoms:** Analyze the bug report and reproduce the issue.
+2.  **Reproduce the Bug:** Isolate the steps to reproduce the bug in a controlled environment.
+3.  **Understand the System:** You will be provided with necessary information to understand how the relevant components interact.
+4.  **Form a Hypothesis:** Based on your understanding, form a hypothesis about the cause of the bug.
+5.  **Test Your Hypothesis:** Add debug logs or use the debugger to validate your hypothesis. Modify the code if necessary to gather more information, but be careful not to introduce new bugs or mask the original issue.
+6.  **Use breakpoints and debug logs**
+7.  **Inspect variables**
+8.  **Step through the code**
+
+## Important Notes
+
+-   **Explicit Rule References:** Whenever you apply any rule from this document in a generated answer, explicitly name it (e.g., “Applying Rule: Code Style”).
+-   When you finish editing, present me with a list of options of how we could continue. Indicate what you think should be the next step.
+-   When I just send you the letter `c`, I mean continue.
+-   Make scripts executable where applicable.
+-   Don't add any docstrings or comments unless they are absolutely necessary for explaining complex logic or the "why" behind a decision.
+-   Use type hints whenever possible.
+-   Group related code together.
+-   Avoid deep nesting of conditionals.
+
+**Remember**: This .cursorrules file is your primary guide. Read it carefully before each coding task.
+
+In the docs folder - we have AppInfo.md - this is where you can find the app info and information about the project. - only refer when necessary.
+
+Print A as before giving answer for every response.

@@ -1,0 +1,140 @@
+[Project Name] ReflectOn
+Every time you choose to apply a rule(s), explicitly state the rule(s) in the output.
+
+Project Context
+ReflectOn is an AI-powered self-reflection app that provides users with a personalized conversation experience to encourage daily self-reflection and personal growth. The app uses real-time voice interaction, processes conversations for insights, and tracks user progress over time.
+
+Code Style and Structure
+Write clean, performant Swift code with SwiftUI for iOS
+Use functional programming patterns where appropriate
+Implement proper separation of concerns between UI, business logic, and data layers
+Use descriptive variable names that reflect the app's domain (e.g., isReflecting, hasCompletedOnboarding)
+
+Structure repository files as follows:
+```
+ReflectOn/
+├── App/
+│   ├── ReflectOnApp.swift
+│   └── AppDelegate.swift
+├── Features/
+│   ├── Onboarding/       # Onboarding flow UI and logic
+│   ├── Home/             # Home screen components
+│   ├── Reflection/       # Self-reflection session components
+│   ├── Stats/            # Statistics and progress views
+│   └── Settings/         # App settings
+├── Core/
+│   ├── Services/         # Firebase, OpenAI integration
+│   ├── Models/           # Data models
+│   ├── Utils/           # Helper functions
+│   └── Extensions/      # Swift extensions
+├── UI/
+│   ├── Components/      # Reusable UI components
+│   ├── Styles/         # Custom SwiftUI styles
+│   └── Resources/      # Assets and strings
+└── Config/             # App configuration files
+```
+
+Tech Stack
+- SwiftUI
+- Firebase (Auth, Firestore, Functions, FCM)
+- OpenAI APIs (Realtime, Whisper, GPT-4)
+- WebRTC for real-time audio
+- StoreKit for subscriptions
+
+Naming Conventions
+- Use PascalCase for type names (views, models)
+- Use camelCase for properties and methods
+- Add "View" suffix to SwiftUI views
+- Add "Service" suffix to service classes
+- Add "Manager" suffix to manager classes
+
+iOS and SwiftUI Usage
+- Use SwiftUI for all new views
+- Implement proper view modifiers
+- Use @StateObject for observed objects that own their data
+- Use @ObservedObject for objects passed into views
+- Implement proper error handling with Result type
+- Use async/await for asynchronous operations
+- Implement proper memory management with weak references
+
+Firebase Integration
+- Follow Firestore data structure exactly as specified in documentation
+- Implement proper error handling for all Firebase operations
+- Use proper security rules as defined
+- Maintain clear separation between Firebase and business logic
+- Handle offline capabilities appropriately
+
+OpenAI Integration
+- Implement proper WebRTC connection management
+- Handle API keys securely using ephemeral keys
+- Implement proper error handling for all API calls
+- Follow the documented conversation flow strictly
+- Maintain proper session state management
+
+State Management
+- Use proper SwiftUI state management (@State, @StateObject, etc.)
+- Implement proper state persistence using UserDefaults or Firestore
+- Handle app lifecycle events appropriately
+- Implement proper cleanup in onDisappear
+
+Audio Handling
+- Implement proper audio session management
+- Handle interruptions (calls, etc.) gracefully
+- Implement proper cleanup of audio resources
+- Follow Apple's audio guidelines
+
+Error Handling
+- Implement proper error handling for all async operations
+- Provide user-friendly error messages
+- Log errors appropriately for debugging
+- Handle network failures gracefully
+- Implement proper retry mechanisms
+
+UI and Styling
+- Follow iOS Human Interface Guidelines
+- Implement proper dark mode support
+- Use semantic colors for better theme support
+- Implement proper accessibility support
+- Handle different device sizes appropriately
+
+Testing
+- Write unit tests for business logic
+- Implement UI tests for critical flows
+- Test offline capabilities
+- Test memory management
+- Test background/foreground transitions
+
+Security
+- Secure storage of sensitive data
+- Proper handling of API keys
+- Implement proper authentication flow
+- Follow Firebase security best practices
+- Proper handling of user data
+
+Git Usage
+Commit Message Prefixes:
+- "fix:" for bug fixes
+- "feat:" for new features
+- "perf:" for performance improvements
+- "docs:" for documentation updates
+- "style:" for UI/styling changes
+- "refactor:" for code refactoring
+- "test:" for adding tests
+
+Documentation
+- Maintain clear README with setup instructions
+- Document all Firebase interactions
+- Document OpenAI API usage
+- Keep code documentation up to date
+- Document all environment configurations
+
+Development Workflow
+- Use proper version control
+- Implement proper code review process
+- Test on multiple iOS versions
+- Follow semantic versioning
+- Maintain changelog
+- Regular security audits
+- Performance monitoring
+
+These rules should be applied consistently across the project, and any deviations should be discussed with the team and documented appropriately.
