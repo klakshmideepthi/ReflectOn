@@ -9,6 +9,8 @@
         <key>NSAllowsArbitraryLoads</key>
         <true/>
     </dict>
+    <key>NSCameraUsageDescription</key>
+    <string>This app does not use the camera.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
