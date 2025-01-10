@@ -21,7 +21,7 @@ class OnboardingViewModel: ObservableObject {
                 return false
             }
         case 2: // Age
-            if age <= 0 || age > 120 {
+            if age <= 13 || age > 99 {
                 validationError = "Please enter a valid age"
                 return false
             }
@@ -60,7 +60,6 @@ class OnboardingViewModel: ObservableObject {
         functions.httpsCallable("storeOnboardingData").call(data) { [weak self] result, error in
             DispatchQueue.main.async {
                 self?.isLoading = false
-                print("$1")
                 
                 if let error = error {
                     self?.error = error

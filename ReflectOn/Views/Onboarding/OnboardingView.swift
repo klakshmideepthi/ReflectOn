@@ -2,6 +2,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @StateObject private var viewModel = OnboardingViewModel()
+    @StateObject private var userViewModel = UserViewModel()
     @State private var currentStep = 1
     @State private var isOnboardingComplete = false
     @AppStorage("log_status") var logStatus: Bool = false
@@ -46,12 +47,13 @@ struct OnboardingView: View {
                         
                         Button(action: {
                             if viewModel.canProceedFromCurrentStep(currentStep) {
-                                if currentStep == 4 {
+                                if currentStep == 6 {
                                     viewModel.saveUserData { success in
                                         if success {
-                                            withAnimation {
-                                                currentStep += 1
-                                                print("Moving to step \(currentStep)")
+                                            Task {
+                                                // Update onboarding complete status
+                                                await userViewModel.updateUserData(field: "onboardingComplete", value: true)
+                                                isOnboardingComplete = true
                                             }
                                         }
                                     }
@@ -60,13 +62,10 @@ struct OnboardingView: View {
                                         currentStep += 1
                                         print("Moving to step \(currentStep)")
                                     }
-                                } else {
-                                    isOnboardingComplete = true
-                                    print("Completing onboarding")
                                 }
                             }
                         }) {
-                            Text("Continue")
+                            Text(currentStep == 6 ? "Complete" : "Continue")
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding()

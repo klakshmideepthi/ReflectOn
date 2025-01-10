@@ -6,7 +6,9 @@ import AuthenticationServices
 
 struct LoginView: View {
     @StateObject private var viewModel = LoginViewModel()
+    @StateObject private var userViewModel = UserViewModel()
     @State private var isLoggedIn = false
+    @State private var needsOnboarding = false
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
@@ -28,7 +30,7 @@ struct LoginView: View {
                         onCompletion: { result in
                             viewModel.handleSignInWithAppleCompletion(result)
                             if viewModel.logStatus {
-                                isLoggedIn = true
+                                checkOnboardingStatus()
                             }
                         }
                     )
@@ -53,7 +55,9 @@ struct LoginView: View {
                                     
                                     let signInResult = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
                                     viewModel.logGoogleUser(user: signInResult.user)
-                                    isLoggedIn = true
+                                    if viewModel.logStatus {
+                                        checkOnboardingStatus()
+                                    }
                                 } catch {
                                     print("Google Sign In Error:", error.localizedDescription)
                                 }
@@ -81,11 +85,33 @@ struct LoginView: View {
                 Spacer()
             }
             .padding(.vertical, 32)
+            .navigationDestination(isPresented: $needsOnboarding) {
+                OnboardingView()
+                    .navigationBarBackButtonHidden(true)
+            }
             .navigationDestination(isPresented: $isLoggedIn) {
                 HomeView()
                     .navigationBarBackButtonHidden(true)
             }
             .alert(viewModel.errorMessage, isPresented: $viewModel.showError) {}
+            .task {
+                if viewModel.logStatus {
+                    checkOnboardingStatus()
+                }
+            }
+        }
+    }
+    
+    private func checkOnboardingStatus() {
+        Task {
+            await userViewModel.fetchUserData()
+            if let user = userViewModel.user {
+                if user.onboardingComplete {
+                    isLoggedIn = true
+                } else {
+                    needsOnboarding = true
+                }
+            }
         }
     }
 }

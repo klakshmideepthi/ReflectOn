@@ -1,17 +1,20 @@
+import SwiftUI
 import WebRTC
+import AVFoundation
 import FirebaseFunctions
+import FirebaseAuth
+import Firebase
 
-// MARK: - WebRTCService
+
 class WebRTCService: NSObject, ObservableObject {
-    // UI State
+    // MARK: - Published Properties
+    
     @Published var connectionStatus: ConnectionStatus = .disconnected
     @Published var eventTypeStr: String = ""
     
-    // Basic conversation text
     @Published var conversation: [ConversationItem] = []
     @Published var outgoingMessage: String = ""
     
-    // We’ll store items by item_id for easy updates
     private var conversationMap: [String : ConversationItem] = [:]
     
     // Model & session config
@@ -24,21 +27,69 @@ class WebRTCService: NSObject, ObservableObject {
     private var dataChannel: RTCDataChannel?
     private var audioTrack: RTCAudioTrack?
     
+    // [New or Updated] Firebase Functions
+    private lazy var functions = Functions.functions()
+    
+    // For demonstration, you might track a "sessionId" for saving transcripts
+    // This could be your own way of referencing conversation sessions.
+    private var currentSessionId: String = UUID().uuidString
+    
+    // Add these properties at the top of the class
+    private var currentUserTranscript: String = ""
+    private var currentAssistantTranscript: String = ""
+    
+    override init() {
+        super.init()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleInterruption(_:)),
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance()
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
     // MARK: - Public Methods
     
-    /// Start a WebRTC connection using a standard API key for local testing.
+    /// Check if microphone permission is granted. If undetermined, it will request.
+    func checkMicrophonePermission(completion: @escaping (Bool) -> Void) {
+        let status = AVAudioSession.sharedInstance().recordPermission
+        switch status {
+        case .granted:
+            completion(true)
+        case .denied:
+            completion(false)
+        case .undetermined:
+            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                DispatchQueue.main.async {
+                    completion(granted)
+                }
+            }
+        @unknown default:
+            completion(false)
+        }
+    }
+    
+    /// 1) Fetch ephemeral key from Firebase using `getEphemeralKey`.
+    /// 2) Start a WebRTC connection with that key.
     func startConnection(
         modelName: String,
         systemMessage: String,
         voice: String
     ) {
+        // Clear old conversation
         conversation.removeAll()
         conversationMap.removeAll()
         
-        // Store updated config
         self.modelName = modelName
         self.systemInstructions = systemMessage
         self.voice = voice
+        self.connectionStatus = .connecting
+        
         
         // Get ephemeral key from Firebase
         let functions = Functions.functions()
@@ -49,121 +100,57 @@ class WebRTCService: NSObject, ObservableObject {
             "model": modelName,
             "voice": voice
         ]
-        
         functions.httpsCallable("getEphemeralKey").call(requestData) { [weak self] result, error in
-            if let error = error as NSError? {
-                print("Error getting ephemeral key: \(error.localizedDescription)")
-                if let details = error.userInfo[FunctionsErrorDetailsKey] {
-                    print("Error details: \(details)")
-                }
-                DispatchQueue.main.async {
-                    self?.connectionStatus = .disconnected
-                }
-                return
-            }
-            
-            guard let resultData = result?.data as? [String: Any],
-                  let clientSecret = resultData["client_secret"] as? [String: Any],
-                  let ephemeralKey = clientSecret["value"] as? String else {
-                print("Invalid response format from getEphemeralKey")
-                if let data = result?.data {
-                    print("Received data structure: \(data)")
-                }
-                DispatchQueue.main.async {
-                    self?.connectionStatus = .disconnected
-                }
-                return
-            }
-            
-            print("Successfully received ephemeral key")
-            DispatchQueue.main.async {
-                self?.setupWebRTCConnection(with: ephemeralKey)
-            }
-        }
-    }
-    
-    private func setupWebRTCConnection(with ephemeralKey: String) {
-        self.setupPeerConnection()
-        self.setupLocalAudio()
-        self.configureAudioSession()
-        
-        guard let peerConnection = self.peerConnection else { 
-            self.connectionStatus = .disconnected
-            return 
-        }
-        
-        // Create a Data Channel for sending/receiving events
-        let config = RTCDataChannelConfiguration()
-        if let channel = peerConnection.dataChannel(forLabel: "oai-events", configuration: config) {
-            self.dataChannel = channel
-            self.dataChannel?.delegate = self
-        }
-        
-        // Create an SDP offer
-        let constraints = RTCMediaConstraints(
-            mandatoryConstraints: ["levelControl": "true"],
-            optionalConstraints: nil
-        )
-        peerConnection.offer(for: constraints) { [weak self] sdp, error in
-            DispatchQueue.main.async {
-                guard let self = self,
-                      let sdp = sdp,
-                      error == nil else {
-                    print("Failed to create offer: \(String(describing: error))")
-                    self?.connectionStatus = .disconnected
-                    return
-                }
-                
-                // Set local description
-                peerConnection.setLocalDescription(sdp) { [weak self] error in
-                    DispatchQueue.main.async {
-                        guard let self = self, error == nil else {
-                            print("Failed to set local description: \(String(describing: error))")
+                    if let error = error as NSError? {
+                        print("Error getting ephemeral key: \(error.localizedDescription)")
+                        if let details = error.userInfo[FunctionsErrorDetailsKey] {
+                            print("Error details: \(details)")
+                        }
+                        DispatchQueue.main.async {
                             self?.connectionStatus = .disconnected
-                            return
                         }
-                        
-                        Task {
-                            do {
-                                guard let localSdp = peerConnection.localDescription?.sdp else {
-                                    self.connectionStatus = .disconnected
-                                    return
-                                }
-                                
-                                // Post SDP offer to Realtime using ephemeral key
-                                let answerSdp = try await self.fetchRemoteSDP(apiKey: ephemeralKey, localSdp: localSdp)
-                                
-                                // Set remote description (answer)
-                                let answer = RTCSessionDescription(type: .answer, sdp: answerSdp)
-                                peerConnection.setRemoteDescription(answer) { error in
-                                    DispatchQueue.main.async {
-                                        if let error {
-                                            print("Failed to set remote description: \(error)")
-                                            self.connectionStatus = .disconnected
-                                        } else {
-                                            self.connectionStatus = .connected
-                                        }
-                                    }
-                                }
-                            } catch {
-                                print("Error fetching remote SDP: \(error)")
-                                await MainActor.run {
-                                    self.connectionStatus = .disconnected
-                                }
-                            }
+                        return
+                    }
+                    
+                    guard let resultData = result?.data as? [String: Any],
+                          let clientSecret = resultData["client_secret"] as? [String: Any],
+                          let ephemeralKey = clientSecret["value"] as? String else {
+                        print("Invalid response format from getEphemeralKey")
+                        if let data = result?.data {
+                            print("Received data structure: \(data)")
                         }
+                        DispatchQueue.main.async {
+                            self?.connectionStatus = .disconnected
+                        }
+                        return
+                    }
+                    
+                    print("Successfully received ephemeral key")
+                    DispatchQueue.main.async {
+                        self?.setupAndOffer(ephemeralKey: ephemeralKey)
                     }
                 }
-            }
-        }
     }
     
+    /// Stop the current WebRTC connection and save transcripts.
     func stopConnection() {
+        // Save transcripts before closing connection
+        saveTranscriptsToFirebase()
+        
         peerConnection?.close()
         peerConnection = nil
         dataChannel = nil
         audioTrack = nil
         connectionStatus = .disconnected
+        
+        // Reset transcripts
+        currentUserTranscript = ""
+        currentAssistantTranscript = ""
+    }
+    
+    /// Toggle local microphone.
+    func setMicrophoneEnabled(_ enabled: Bool) {
+        audioTrack?.isEnabled = enabled
     }
     
     /// Sends a custom "conversation.item.create" event
@@ -205,7 +192,6 @@ class WebRTCService: NSObject, ObservableObject {
         }
     }
     
-    /// Called automatically when data channel opens, or you can manually call it.
     /// Updates session configuration with the latest instructions and voice.
     func sendSessionUpdate() {
         guard let dc = dataChannel, dc.readyState == .open else {
@@ -246,10 +232,87 @@ class WebRTCService: NSObject, ObservableObject {
     }
     
     // MARK: - Private Methods
+
+    /// [New] Called after ephemeral key has been retrieved. Sets up local PC and does offer/answer exchange.
+    private func setupAndOffer(ephemeralKey: String) {
+        setupPeerConnection()
+        setupLocalAudio()
+        configureAudioSession()
+        
+        guard let peerConnection = peerConnection else {
+            self.connectionStatus = .disconnected
+            return
+        }
+        
+        // Create a Data Channel
+        let config = RTCDataChannelConfiguration()
+        config.isOrdered = true
+        if let channel = peerConnection.dataChannel(forLabel: "oai-events", configuration: config) {
+            dataChannel = channel
+            dataChannel?.delegate = self
+        }
+        
+        // Create an SDP offer
+        let constraints = RTCMediaConstraints(
+            mandatoryConstraints: ["levelControl": "true"],
+            optionalConstraints: nil
+        )
+        peerConnection.offer(for: constraints) { [weak self] sdp, error in
+            guard
+                let self = self,
+                let sdp = sdp,
+                error == nil
+            else {
+                print("Failed to create offer: \(String(describing: error))")
+                DispatchQueue.main.async {
+                    self?.connectionStatus = .disconnected
+                }
+                return
+            }
+            // Set local description
+            peerConnection.setLocalDescription(sdp) { [weak self] error in
+                guard let self = self, error == nil else {
+                    print("Failed to set local description: \(String(describing: error))")
+                    DispatchQueue.main.async {
+                        self?.connectionStatus = .disconnected
+                    }
+                    return
+                }
+                
+                Task {
+                    do {
+                        guard let localSdp = peerConnection.localDescription?.sdp else {
+                            return
+                        }
+                        // [Updated] Post SDP offer to Realtime using ephemeralKey
+                        let answerSdp = try await self.fetchRemoteSDP(ephemeralKey: ephemeralKey, localSdp: localSdp)
+                        
+                        // Set remote description
+                        let answer = RTCSessionDescription(type: .answer, sdp: answerSdp)
+                        peerConnection.setRemoteDescription(answer) { error in
+                            DispatchQueue.main.async {
+                                if let error {
+                                    print("Failed to set remote description: \(error)")
+                                    self.connectionStatus = .disconnected
+                                } else {
+                                    self.connectionStatus = .connected
+                                }
+                            }
+                        }
+                    } catch {
+                        print("Error fetching remote SDP: \(error)")
+                        DispatchQueue.main.async {
+                            self.connectionStatus = .disconnected
+                        }
+                    }
+                }
+            }
+        }
+    }
     
     private func setupPeerConnection() {
         let config = RTCConfiguration()
-        // If needed, configure ICE servers here
+        // config.iceServers = [...] if needed
         let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
         let factory = RTCPeerConnectionFactory()
         peerConnection = factory.peerConnection(with: config, constraints: constraints, delegate: self)
@@ -281,14 +344,14 @@ class WebRTCService: NSObject, ObservableObject {
         )
         
         let audioSource = factory.audioSource(with: constraints)
-        
         let localAudioTrack = factory.audioTrack(with: audioSource, trackId: "local_audio")
+        
         peerConnection.add(localAudioTrack, streamIds: ["local_stream"])
         audioTrack = localAudioTrack
     }
     
-    /// Posts our SDP offer to the Realtime API, returns the answer SDP.
-    private func fetchRemoteSDP(apiKey: String, localSdp: String) async throws -> String {
+    /// [Updated] Instead of apiKey, accept ephemeralKey to authenticate to OpenAI Realtime
+    private func fetchRemoteSDP(ephemeralKey: String, localSdp: String) async throws -> String {
         let baseUrl = "https://api.openai.com/v1/realtime"
         guard let url = URL(string: "\(baseUrl)?model=\(modelName)") else {
             throw URLError(.badURL)
@@ -297,7 +360,7 @@ class WebRTCService: NSObject, ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/sdp", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(ephemeralKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = localSdp.data(using: .utf8)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -318,6 +381,8 @@ class WebRTCService: NSObject, ObservableObject {
         return answerSdp
     }
     
+    // MARK: - Handling JSON and Transcripts
+    
     private func handleIncomingJSON(_ jsonString: String) {
         print("Received JSON:\n\(jsonString)\n")
         
@@ -336,10 +401,9 @@ class WebRTCService: NSObject, ObservableObject {
                let itemId = item["id"] as? String,
                let role = item["role"] as? String
             {
-                // If item contains "content", extract the text
                 let text = (item["content"] as? [[String: Any]])?.first?["text"] as? String ?? ""
-                
                 let newItem = ConversationItem(id: itemId, role: role, text: text)
+                
                 conversationMap[itemId] = newItem
                 if role == "assistant" || role == "user" {
                     conversation.append(newItem)
@@ -347,7 +411,7 @@ class WebRTCService: NSObject, ObservableObject {
             }
             
         case "response.audio_transcript.delta":
-            // partial transcript for assistant’s message
+            // partial transcript for assistant's message
             if let itemId = eventDict["item_id"] as? String,
                let delta = eventDict["delta"] as? String
             {
@@ -361,7 +425,7 @@ class WebRTCService: NSObject, ObservableObject {
             }
             
         case "response.audio_transcript.done":
-            // final transcript for assistant’s message
+            // final transcript for assistant's message
             if let itemId = eventDict["item_id"] as? String,
                let transcript = eventDict["transcript"] as? String
             {
@@ -372,6 +436,7 @@ class WebRTCService: NSObject, ObservableObject {
                         conversation[idx].text = transcript
                     }
                 }
+                currentAssistantTranscript += transcript
             }
             
         case "conversation.item.input_audio_transcription.completed":
@@ -386,9 +451,88 @@ class WebRTCService: NSObject, ObservableObject {
                         conversation[idx].text = transcript
                     }
                 }
+                print("*************** \(transcript)")
+                currentUserTranscript += transcript
+                print("*************** \(currentUserTranscript)")
             }
             
         default:
+            break
+        }
+    }
+    
+    /// Saves both user and assistant transcripts together
+    func saveTranscriptsToFirebase() {
+        guard let user = Auth.auth().currentUser else {
+            print("No authenticated user.")
+            return
+        }
+        
+        // Snapshot transcripts now, to avoid timing issues
+        let userTranscriptSnapshot = currentUserTranscript
+        let assistantTranscriptSnapshot = currentAssistantTranscript
+        
+        // Confirm we actually have content
+        guard !userTranscriptSnapshot.isEmpty || !assistantTranscriptSnapshot.isEmpty else {
+            print("No transcripts to save")
+            return
+        }
+        
+        user.getIDToken { token, error in
+            guard let token = token, error == nil else {
+                print("Error getting ID token:", error?.localizedDescription ?? "")
+                return
+            }
+            
+            // Now use the local snapshot
+            let data: [String: Any] = [
+                "sessionId": self.currentSessionId,
+                "userTranscript": userTranscriptSnapshot,
+                "assistantTranscript": assistantTranscriptSnapshot,
+                "userId": user.uid,
+                "timestamp": Date().timeIntervalSince1970
+            ]
+            print("Sending transcripts:", data)
+            
+            Functions.functions()
+                .httpsCallable("transcribeAudio")
+                .call(data) { result, error in
+                    if let error = error as NSError? {
+                        print("Error saving transcripts:", error.localizedDescription)
+                        return
+                    }
+                    print("Transcripts saved successfully for sessionId=\(self.currentSessionId)")
+                }
+        }
+    }
+    
+    // MARK: - Audio Interruptions
+    
+    @objc private func handleInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            print("Audio session interruption began.")
+            // Optionally mute if needed
+        case .ended:
+            print("Audio session interruption ended.")
+            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                if options.contains(.shouldResume) {
+                    do {
+                        try AVAudioSession.sharedInstance().setActive(true)
+                        print("Resumed audio session after interruption.")
+                    } catch {
+                        print("Failed to resume audio session: \(error)")
+                    }
+                }
+            }
+        @unknown default:
             break
         }
     }
@@ -397,7 +541,13 @@ class WebRTCService: NSObject, ObservableObject {
 // MARK: - RTCPeerConnectionDelegate
 extension WebRTCService: RTCPeerConnectionDelegate {
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}
-    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {}
+    
+    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
+        if let remoteAudioTrack = stream.audioTracks.first {
+            print("Received remote audio track: \(remoteAudioTrack.trackId)")
+        }
+    }
+    
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {}
     func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
     
@@ -410,7 +560,6 @@ extension WebRTCService: RTCPeerConnectionDelegate {
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
     
     func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {
-        // If the server creates the data channel on its side, handle it here
         dataChannel.delegate = self
     }
 }
@@ -419,7 +568,6 @@ extension WebRTCService: RTCPeerConnectionDelegate {
 extension WebRTCService: RTCDataChannelDelegate {
     func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) {
         print("Data channel state changed: \(dataChannel.readyState)")
-        // Auto-send session.update after channel is open
         if dataChannel.readyState == .open {
             sendSessionUpdate()
         }

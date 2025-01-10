@@ -9,7 +9,7 @@ struct ContextView: View {
     @FocusState private var isTextFieldFocused: Bool
     
     // AppStorage properties
-    @AppStorage("systemMessage") private var systemMessage = "You are a helpful, witty, and friendly AI. Act like a human. Your voice and personality should be warm and engaging, with a lively and playful tone. Talk quickly."
+    @AppStorage("systemMessage") private var systemMessage = "Speak only in english.You are a helpful, witty, and friendly AI. Act like a human. Your voice and personality should be warm and engaging, with a lively and playful tone. Talk quickly."
     @AppStorage("selectedModel") private var selectedModel = "gpt-4o-mini-realtime-preview-2024-12-17"
     @AppStorage("selectedVoice") private var selectedVoice = "alloy"
     
