@@ -98,10 +98,12 @@ struct ProfileView: View {
             }
         }
         .refreshable {
-            userViewModel.fetchUserData()
+            await userViewModel.fetchUserData()
         }
         .onAppear {
-            userViewModel.fetchUserData()
+            Task {
+                await userViewModel.fetchUserData()
+            }
         }
         .alert("Error", isPresented: Binding(
             get: { userViewModel.error != nil },

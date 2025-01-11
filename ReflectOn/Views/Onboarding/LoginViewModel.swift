@@ -86,23 +86,19 @@ final class LoginViewModel: NSObject, ObservableObject {
     }
     
     // MARK: - Sign in with Google
-    func logGoogleUser(user: GIDGoogleUser) {
-        Task {
-            do {
-                guard let idToken = user.idToken else { return }
-                let accessToken = user.accessToken
-                let credential = GoogleAuthProvider.credential(
-                    withIDToken: idToken.tokenString,
-                    accessToken: accessToken.tokenString
-                )
-                try await Auth.auth().signIn(with: credential)
-                self.logStatus = true
-                print("Google login successful, logStatus set to true")
-            } catch {
-                self.errorMessage = error.localizedDescription
-                self.showError = true
-            }
-        }
+    func logGoogleUser(user: GIDGoogleUser) async throws {
+        guard let idToken = user.idToken else { return }
+        let accessToken = user.accessToken
+        let credential = GoogleAuthProvider.credential(
+            withIDToken: idToken.tokenString,
+            accessToken: accessToken.tokenString
+        )
+        // If Auth.auth().signIn(with:) is async, this is a real suspend point
+        try await Auth.auth().signIn(with: credential)
+        
+        // Update your model states
+        self.logStatus = true
+        print("Google login successful, logStatus set to true")
     }
     
     func signOut() async {

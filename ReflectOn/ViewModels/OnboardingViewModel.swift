@@ -66,13 +66,11 @@ class OnboardingViewModel: ObservableObject {
                     completion(false)
                     return
                 }
-                print("$2")
                 
                 guard let data = result?.data as? [String: Any],
                       let success = data["success"] as? Bool else {
                     self?.error = NSError(domain: "", code: -1, 
                                         userInfo: [NSLocalizedDescriptionKey: "Invalid response from server"])
-                    print("$1")
                     completion(false)
                     return
                 }

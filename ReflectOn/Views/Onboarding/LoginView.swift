@@ -5,6 +5,7 @@ import Firebase
 import AuthenticationServices
 
 struct LoginView: View {
+    @StateObject private var onboardingViewModel = OnboardingViewModel()
     @StateObject private var viewModel = LoginViewModel()
     @StateObject private var userViewModel = UserViewModel()
     @State private var isLoggedIn = false
@@ -54,7 +55,7 @@ struct LoginView: View {
                                     }
                                     
                                     let signInResult = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
-                                    viewModel.logGoogleUser(user: signInResult.user)
+                                    try await viewModel.logGoogleUser(user: signInResult.user)
                                     if viewModel.logStatus {
                                         checkOnboardingStatus()
                                     }
@@ -94,7 +95,7 @@ struct LoginView: View {
                     .navigationBarBackButtonHidden(true)
             }
             .alert(viewModel.errorMessage, isPresented: $viewModel.showError) {}
-            .task {
+            .onAppear {
                 if viewModel.logStatus {
                     checkOnboardingStatus()
                 }
@@ -103,12 +104,26 @@ struct LoginView: View {
     }
     
     private func checkOnboardingStatus() {
+        onboardingViewModel.saveUserData { success in
+            if success {
+                Task {
+                    // Update onboarding complete status
+                    userViewModel.updateUserData(field: "onboardingComplete", value: true)
+                }
+            }
+        }
         Task {
             await userViewModel.fetchUserData()
             if let user = userViewModel.user {
-                if user.onboardingComplete {
-                    isLoggedIn = true
-                } else {
+                withAnimation {
+                    if user.onboardingComplete {
+                        isLoggedIn = true
+                    } else {
+                        needsOnboarding = true
+                    }
+                }
+            } else {
+                withAnimation {
                     needsOnboarding = true
                 }
             }

@@ -2,11 +2,12 @@ import SwiftUI
 import AVFoundation
 
 struct ContextView: View {
-    @StateObject private var webrtcService = WebRTCService()
+    @ObservedObject var webrtcService: WebRTCService
     @Environment(\.dismiss) private var dismiss
     
     @State private var showOptionsSheet = false
     @FocusState private var isTextFieldFocused: Bool
+    @AppStorage("log_status") var logStatus: Bool = false
     
     // AppStorage properties
     @AppStorage("systemMessage") private var systemMessage = "Speak only in english.You are a helpful, witty, and friendly AI. Act like a human. Your voice and personality should be warm and engaging, with a lively and playful tone. Talk quickly."
@@ -49,7 +50,6 @@ struct ContextView: View {
             
             ConversationView()
             
-            MessageInputView()
         }
         .onAppear(perform: requestMicrophonePermission)
         .sheet(isPresented: $showOptionsSheet) {
@@ -61,6 +61,7 @@ struct ContextView: View {
                 voiceOptions: voiceOptions
             )
         }
+        .smartAIStatsNavigation(webRTCService: webrtcService)
     }
     
     private func requestMicrophonePermission() {
@@ -183,22 +184,6 @@ struct ContextView: View {
         .padding(.bottom, msg.role == "assistant" ? 24 : 8)
     }
     
-    // MARK: - Message Input
-    @ViewBuilder
-    private func MessageInputView() -> some View {
-        HStack {
-            TextField("Insert message...", text: $webrtcService.outgoingMessage, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .focused($isTextFieldFocused)
-            Button("Send") {
-                webrtcService.sendMessage()
-                isTextFieldFocused = false
-            }
-            .disabled(webrtcService.connectionStatus != .connected)
-            .buttonStyle(.bordered)
-        }
-        .padding([.horizontal, .bottom])
-    }
 }
 
 struct OptionsView: View {
@@ -296,6 +281,6 @@ enum ConnectionStatus: String {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContextView()
+        ContextView(webrtcService: WebRTCService())
     }
 }

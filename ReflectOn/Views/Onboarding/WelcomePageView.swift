@@ -76,6 +76,7 @@ struct WelcomePageView: View {
             }
             .navigationDestination(isPresented: $showLoginView) {
                 LoginView()
+                    .navigationBarBackButtonHidden(true)
             }
         }
     }

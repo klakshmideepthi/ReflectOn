@@ -4,7 +4,6 @@ struct OnboardingView: View {
     @StateObject private var viewModel = OnboardingViewModel()
     @StateObject private var userViewModel = UserViewModel()
     @State private var currentStep = 1
-    @State private var isOnboardingComplete = false
     @AppStorage("log_status") var logStatus: Bool = false
 
     var body: some View {
@@ -45,34 +44,27 @@ struct OnboardingView: View {
                                 .multilineTextAlignment(.center)
                         }
                         
-                        Button(action: {
-                            if viewModel.canProceedFromCurrentStep(currentStep) {
-                                if currentStep == 6 {
-                                    viewModel.saveUserData { success in
-                                        if success {
-                                            Task {
-                                                // Update onboarding complete status
-                                                await userViewModel.updateUserData(field: "onboardingComplete", value: true)
-                                                isOnboardingComplete = true
-                                            }
+
+                        
+                        if(currentStep < 6) {
+                            Button(action: {
+                                if viewModel.canProceedFromCurrentStep(currentStep) {
+                                if currentStep < 6 {
+                                        withAnimation {
+                                            currentStep += 1
                                         }
                                     }
-                                } else if currentStep < 6 {
-                                    withAnimation {
-                                        currentStep += 1
-                                        print("Moving to step \(currentStep)")
-                                    }
                                 }
+                            }) {
+                                Text(currentStep == 5 ? "Complete" : "Continue")
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.blue)
+                                    .cornerRadius(10)
                             }
-                        }) {
-                            Text(currentStep == 6 ? "Complete" : "Continue")
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .cornerRadius(10)
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                     }
                     .padding(.vertical)
                     .background(Color(UIColor.systemBackground))
@@ -82,10 +74,6 @@ struct OnboardingView: View {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle())
                 }
-            }
-            .navigationDestination(isPresented: $isOnboardingComplete) {
-                HomeView()
-                    .navigationBarBackButtonHidden(true)
             }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.error != nil },
@@ -97,4 +85,4 @@ struct OnboardingView: View {
             }
         }
     }
-} 
+}

@@ -32,11 +32,16 @@ class WebRTCService: NSObject, ObservableObject {
     
     // For demonstration, you might track a "sessionId" for saving transcripts
     // This could be your own way of referencing conversation sessions.
-    private var currentSessionId: String = UUID().uuidString
+    @Published var currentSessionId: String = UUID().uuidString
     
     // Add these properties at the top of the class
-    private var currentUserTranscript: String = ""
-    private var currentAssistantTranscript: String = ""
+    private var currentSessionTranscript: String = ""
+    private var currentSession: Session?
+    
+    @Published var shouldShowSmartAIStats: Bool = false
+    
+    // Add property to store ephemeral key
+    private var ephemeralKey: String?
     
     override init() {
         super.init()
@@ -90,62 +95,28 @@ class WebRTCService: NSObject, ObservableObject {
         self.voice = voice
         self.connectionStatus = .connecting
         
-        
-        // Get ephemeral key from Firebase
-        let functions = Functions.functions()
-        print("Calling getEphemeralKey function...")
-        
-        // Define request data structure
-        let requestData: [String: String] = [
-            "model": modelName,
-            "voice": voice
-        ]
-        functions.httpsCallable("getEphemeralKey").call(requestData) { [weak self] result, error in
-                    if let error = error as NSError? {
-                        print("Error getting ephemeral key: \(error.localizedDescription)")
-                        if let details = error.userInfo[FunctionsErrorDetailsKey] {
-                            print("Error details: \(details)")
-                        }
-                        DispatchQueue.main.async {
-                            self?.connectionStatus = .disconnected
-                        }
-                        return
-                    }
-                    
-                    guard let resultData = result?.data as? [String: Any],
-                          let clientSecret = resultData["client_secret"] as? [String: Any],
-                          let ephemeralKey = clientSecret["value"] as? String else {
-                        print("Invalid response format from getEphemeralKey")
-                        if let data = result?.data {
-                            print("Received data structure: \(data)")
-                        }
-                        DispatchQueue.main.async {
-                            self?.connectionStatus = .disconnected
-                        }
-                        return
-                    }
-                    
-                    print("Successfully received ephemeral key")
-                    DispatchQueue.main.async {
-                        self?.setupAndOffer(ephemeralKey: ephemeralKey)
-                    }
-                }
+        // Use stored ephemeral key if available
+        if let ephemeralKey = self.ephemeralKey {
+            setupAndOffer(ephemeralKey: ephemeralKey)
+        } else {
+            // Fallback to getting new key if needed
+            prepareConnection(modelName: modelName, systemMessage: systemMessage, voice: voice)
+        }
     }
     
     /// Stop the current WebRTC connection and save transcripts.
-    func stopConnection() {
-        // Save transcripts before closing connection
-        saveTranscriptsToFirebase()
-        
+    func stopConnection(completion: (() -> Void)? = nil) {
         peerConnection?.close()
         peerConnection = nil
         dataChannel = nil
         audioTrack = nil
         connectionStatus = .disconnected
         
-        // Reset transcripts
-        currentUserTranscript = ""
-        currentAssistantTranscript = ""
+        // Reset transcripts after saving
+        saveTranscriptsToFirebase()
+        currentSessionTranscript = ""
+        
+        completion?()
     }
     
     /// Toggle local microphone.
@@ -384,7 +355,6 @@ class WebRTCService: NSObject, ObservableObject {
     // MARK: - Handling JSON and Transcripts
     
     private func handleIncomingJSON(_ jsonString: String) {
-        print("Received JSON:\n\(jsonString)\n")
         
         guard let data = jsonString.data(using: .utf8),
               let rawEvent = try? JSONSerialization.jsonObject(with: data),
@@ -436,7 +406,7 @@ class WebRTCService: NSObject, ObservableObject {
                         conversation[idx].text = transcript
                     }
                 }
-                currentAssistantTranscript += transcript
+                currentSessionTranscript += "\nAssistant: \(transcript)\n"
             }
             
         case "conversation.item.input_audio_transcription.completed":
@@ -451,9 +421,7 @@ class WebRTCService: NSObject, ObservableObject {
                         conversation[idx].text = transcript
                     }
                 }
-                print("*************** \(transcript)")
-                currentUserTranscript += transcript
-                print("*************** \(currentUserTranscript)")
+                currentSessionTranscript += "\nUser: \(transcript)\n"
             }
             
         default:
@@ -468,40 +436,67 @@ class WebRTCService: NSObject, ObservableObject {
             return
         }
         
+        // Create a new session
+        currentSession = Session(
+            sessionId: currentSessionId,
+            startTime: Date(),
+            endTime: Date(),
+            transcript: currentSessionTranscript,
+            status: .transcribed
+        )
+        
         // Snapshot transcripts now, to avoid timing issues
-        let userTranscriptSnapshot = currentUserTranscript
-        let assistantTranscriptSnapshot = currentAssistantTranscript
+        let transcriptSnapshot = currentSessionTranscript
         
         // Confirm we actually have content
-        guard !userTranscriptSnapshot.isEmpty || !assistantTranscriptSnapshot.isEmpty else {
+        guard !transcriptSnapshot.isEmpty else {
             print("No transcripts to save")
+            DispatchQueue.main.async {
+                self.shouldShowSmartAIStats = true  // Show stats even if empty
+            }
             return
         }
         
-        user.getIDToken { token, error in
-            guard let token = token, error == nil else {
-                print("Error getting ID token:", error?.localizedDescription ?? "")
+        let data: [String: Any] = [
+            "sessionId": currentSessionId,
+            "transcript": transcriptSnapshot,
+            "userId": user.uid,
+            "timestamp": Date().timeIntervalSince1970,
+            "status": SessionStatus.transcribed.rawValue,
+            "startTime": currentSession?.startTime.timeIntervalSince1970 ?? Date().timeIntervalSince1970,
+            "endTime": Date().timeIntervalSince1970
+        ]
+        
+        // Save to Firestore
+        let db = Firestore.firestore()
+        db.collection("sessions").document(currentSessionId).setData(data) { [weak self] error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("Error saving session:", error.localizedDescription)
+                DispatchQueue.main.async {
+                    self.shouldShowSmartAIStats = true  // Show stats even on error
+                }
                 return
             }
             
-            // Now use the local snapshot
-            let data: [String: Any] = [
-                "sessionId": self.currentSessionId,
-                "userTranscript": userTranscriptSnapshot,
-                "assistantTranscript": assistantTranscriptSnapshot,
-                "userId": user.uid,
-                "timestamp": Date().timeIntervalSince1970
-            ]
-            print("Sending transcripts:", data)
-            
+            // After successful save, generate insights
             Functions.functions()
-                .httpsCallable("transcribeAudio")
-                .call(data) { result, error in
-                    if let error = error as NSError? {
-                        print("Error saving transcripts:", error.localizedDescription)
-                        return
+                .httpsCallable("generateSmartAIStats")
+                .call(["sessionId": self.currentSessionId]) { result, error in
+                    DispatchQueue.main.async {
+                        self.shouldShowSmartAIStats = true  // Show stats after generating insights
                     }
-                    print("Transcripts saved successfully for sessionId=\(self.currentSessionId)")
+                    
+                    if let error = error {
+                        print("Error generating insights:", error.localizedDescription)
+                        // Update status to failed
+                        db.collection("sessions").document(self.currentSessionId)
+                            .updateData(["status": SessionStatus.insightsGenerationFailed.rawValue])
+                    } else {
+                        print("Insights generated successfully")
+                        // Status will be updated by the cloud function
+                    }
                 }
         }
     }
@@ -534,6 +529,49 @@ class WebRTCService: NSObject, ObservableObject {
             }
         @unknown default:
             break
+        }
+    }
+    
+    // New method to prepare connection by fetching key
+    func prepareConnection(
+        modelName: String,
+        systemMessage: String,
+        voice: String
+    ) {
+        self.modelName = modelName
+        self.systemInstructions = systemMessage
+        self.voice = voice
+        
+        // Get ephemeral key from Firebase
+        let functions = Functions.functions()
+        print("Calling getEphemeralKey function...")
+        
+        let requestData: [String: String] = [
+            "model": modelName,
+            "voice": voice
+        ]
+        
+        functions.httpsCallable("getEphemeralKey").call(requestData) { [weak self] result, error in
+            if let error = error as NSError? {
+                print("Error getting ephemeral key: \(error.localizedDescription)")
+                if let details = error.userInfo[FunctionsErrorDetailsKey] {
+                    print("Error details: \(details)")
+                }
+                return
+            }
+            
+            guard let resultData = result?.data as? [String: Any],
+                  let clientSecret = resultData["client_secret"] as? [String: Any],
+                  let ephemeralKey = clientSecret["value"] as? String else {
+                print("Invalid response format from getEphemeralKey")
+                if let data = result?.data {
+                    print("Received data structure: \(data)")
+                }
+                return
+            }
+            
+            print("Successfully received ephemeral key")
+            self?.ephemeralKey = ephemeralKey
         }
     }
 }
@@ -581,5 +619,27 @@ extension WebRTCService: RTCDataChannelDelegate {
         DispatchQueue.main.async {
             self.handleIncomingJSON(message)
         }
+    }
+}
+
+struct SmartAIStatsNavigationModifier: ViewModifier {
+    @ObservedObject var webRTCService: WebRTCService
+    
+    func body(content: Content) -> some View {
+        content
+            .fullScreenCover(isPresented: $webRTCService.shouldShowSmartAIStats) {
+                NavigationStack {
+                    SmartAIStatsView(sessionId: webRTCService.currentSessionId)
+                        .navigationBarItems(trailing: Button("Done") {
+                            webRTCService.shouldShowSmartAIStats = false
+                        })
+                }
+            }
+    }
+}
+
+extension View {
+    func smartAIStatsNavigation(webRTCService: WebRTCService) -> some View {
+        self.modifier(SmartAIStatsNavigationModifier(webRTCService: webRTCService))
     }
 }

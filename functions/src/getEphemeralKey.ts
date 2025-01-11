@@ -91,8 +91,7 @@ export const getEphemeralKey = functions.https.onCall(async (data, context) => {
 // Define the shape of the data your client sends to transcribeAudio
 export interface TranscribeAudioRequest {
   sessionId: string;
-  userTranscript: string;
-  assistantTranscript: string;
+  transcript: string;
   userId: string;
   timestamp: number;
 }
@@ -118,7 +117,7 @@ export const transcribeAudio = functions.https.onCall(async (data, context) => {
   }
 
   const requestData = data as TranscribeAudioRequest;
-  const {sessionId, userTranscript, assistantTranscript, userId, timestamp} = requestData;
+  const {sessionId, transcript, userId, timestamp} = requestData;
 
   // Log authentication details
   logger.info("Authentication details:", {
@@ -128,11 +127,10 @@ export const transcribeAudio = functions.https.onCall(async (data, context) => {
   });
 
   // Validate input
-  if (!sessionId || (!userTranscript || !assistantTranscript) || !userId) {
+  if (!sessionId || (!transcript) || !userId) {
     logger.error("Missing required data", {
       sessionId, 
-      hasUserTranscript: !!userTranscript,
-      hasAssistantTranscript: !!assistantTranscript,
+      hastranscript: !!transcript,
       userId
     });
     throw new functions.https.HttpsError(
@@ -174,8 +172,7 @@ export const transcribeAudio = functions.https.onCall(async (data, context) => {
     // Update session document
     batch.set(sessionRef, {
       userId,
-      userTranscript,
-      assistantTranscript,
+      transcript,
       status: "completed",
       timestamp: firestore.Timestamp.fromMillis(timestamp),
       endTime: firestore.FieldValue.serverTimestamp(),
@@ -186,8 +183,7 @@ export const transcribeAudio = functions.https.onCall(async (data, context) => {
     const transcriptRef = userRef.collection("transcripts").doc();
     batch.set(transcriptRef, {
       sessionId,
-      userTranscript,
-      assistantTranscript,
+      transcript,
       timestamp: firestore.Timestamp.fromMillis(timestamp)
     });
 
