@@ -1,8 +1,9 @@
 import SwiftUI
 import AVFoundation
+import RiveRuntime
 
 struct ContextView: View {
-    @ObservedObject var webrtcService: WebRTCService
+    @StateObject private var webrtcService = WebRTCService()
     @Environment(\.dismiss) private var dismiss
     
     @State private var showOptionsSheet = false
@@ -20,6 +21,9 @@ struct ContextView: View {
         "gpt-4o-realtime-preview-2024-12-17"
     ]
     private let voiceOptions = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"]
+    
+    // Add Rive view model
+    @StateObject private var riveViewModel = RiveViewModel(fileName: "glow_ball_v03",stateMachineName:"State Machine 1")
     
     var body: some View {
         VStack(spacing: 12) {
@@ -43,15 +47,38 @@ struct ContextView: View {
                 Spacer()
             }
             .padding(.top, 8)
+        
             
-            HeaderView()
+            // Add Rive animation view
+            riveViewModel.view()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false) // Disables user interaction on the Rive view
+                .onChange(of: webrtcService.connectionStatus) { newStatus in
+                    print("Connection status changed to: \(newStatus)")
+                    switch newStatus {
+                    case .connected:
+                        riveViewModel.triggerInput("open_trig")
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    case .connecting:
+                        print("Connection in progress")
+                        riveViewModel.triggerInput("bing_trig")
+                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                    case .disconnected:
+                        print("Connection disconnected")
+                        riveViewModel.triggerInput("close_trig")
+                    }
+                }
+            
+            Spacer()
+            
             ConnectionControls()
-            Divider().padding(.vertical, 6)
             
-            ConversationView()
+            Spacer()
             
         }
-        .onAppear(perform: requestMicrophonePermission)
+        .onAppear(perform: {
+            requestMicrophonePermission()
+        })
         .sheet(isPresented: $showOptionsSheet) {
             OptionsView(
                 systemMessage: $systemMessage,
@@ -67,20 +94,6 @@ struct ContextView: View {
     private func requestMicrophonePermission() {
         AVAudioSession.sharedInstance().requestRecordPermission { granted in
             print("Microphone permission granted: \(granted)")
-        }
-    }
-    
-    @ViewBuilder
-    private func HeaderView() -> some View {
-        VStack(spacing: 2) {
-            Text("Advanced Voice Mode")
-                .font(.system(size: 24, weight: .bold))
-                .padding(.top, 12)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-            Text("In Swift with WebRTC")
-                .font(.system(size: 15, weight: .light))
-                .padding(.bottom, 10)
         }
     }
     
@@ -102,7 +115,7 @@ struct ContextView: View {
                     case .connected:
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     case .disconnected:
-                        webrtcService.eventTypeStr = ""
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     }
                 }
             
@@ -138,31 +151,6 @@ struct ContextView: View {
         .padding(.horizontal)
     }
     
-    // MARK: - Conversation View
-    @ViewBuilder
-    private func ConversationView() -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text("Conversation")
-                    .font(.headline)
-                Spacer()
-                Text(webrtcService.eventTypeStr)
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .padding(.leading, 16)
-            }
-            .padding(.horizontal)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(webrtcService.conversation) { msg in
-                        MessageRow(msg: msg)
-                    }
-                }
-                .padding()
-            }
-        }
-    }
     
     // MARK: - Message Row
     @ViewBuilder
@@ -236,9 +224,9 @@ struct OptionsView: View {
 // MARK: - Models and Enums
 
 struct ConversationItem: Identifiable {
-    let id: String       // item_id from the JSON
-    let role: String     // "user" / "assistant"
-    var text: String     // transcript
+    let id: String        // item_id from the JSON
+    let role: String       // "user" / "assistant"
+    var text: String       // transcript
     
     var roleSymbol: String {
         role.lowercased() == "user" ? "person.fill" : "sparkles"
@@ -281,6 +269,6 @@ enum ConnectionStatus: String {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContextView(webrtcService: WebRTCService())
+        ContextView()
     }
 }

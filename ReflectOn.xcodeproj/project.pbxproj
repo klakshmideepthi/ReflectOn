@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D85BC6FB2D39ED6300E065E1 /* RiveRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = D85BC6FA2D39ED6300E065E1 /* RiveRuntime */; };
 		D8B69E2C2D2CC8050030FEC0 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = D8B69E2B2D2CC8050030FEC0 /* WebRTC */; };
 		D8D8727A2D2AF6DA00ED37D0 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = D8D872792D2AF6DA00ED37D0 /* GoogleSignIn */; };
 		D8D8727C2D2AF6DA00ED37D0 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = D8D8727B2D2AF6DA00ED37D0 /* GoogleSignInSwift */; };
@@ -80,6 +81,7 @@
 				D8D8727C2D2AF6DA00ED37D0 /* GoogleSignInSwift in Frameworks */,
 				D8B69E2C2D2CC8050030FEC0 /* WebRTC in Frameworks */,
 				D8D872842D2AF6F000ED37D0 /* FirebaseFunctions in Frameworks */,
+				D85BC6FB2D39ED6300E065E1 /* RiveRuntime in Frameworks */,
 				D8D872822D2AF6E700ED37D0 /* FirebaseFirestore in Frameworks */,
 				D8D872802D2AF6E700ED37D0 /* FirebaseAuth in Frameworks */,
 			);
@@ -157,6 +159,7 @@
 				D8D872812D2AF6E700ED37D0 /* FirebaseFirestore */,
 				D8D872832D2AF6F000ED37D0 /* FirebaseFunctions */,
 				D8B69E2B2D2CC8050030FEC0 /* WebRTC */,
+				D85BC6FA2D39ED6300E065E1 /* RiveRuntime */,
 			);
 			productName = ReflectOn;
 			productReference = D8D872372D2AF4AC00ED37D0 /* ReflectOn.app */;
@@ -244,6 +247,7 @@
 				D8D872762D2AF6A600ED37D0 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				D8D872772D2AF6B900ED37D0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				D8B69E2A2D2CC8050030FEC0 /* XCRemoteSwiftPackageReference "WebRTC" */,
+				D85BC6F92D39ED6300E065E1 /* XCRemoteSwiftPackageReference "rive-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D8D872382D2AF4AC00ED37D0 /* Products */;
@@ -445,7 +449,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = ReflectOn/ReflectOn.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"ReflectOn/Preview Content\"";
 				DEVELOPMENT_TEAM = 3D5Z4RTGYG;
 				ENABLE_PREVIEWS = YES;
@@ -457,12 +461,12 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = Deepthi.ReflectOn;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -482,7 +486,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = ReflectOn/ReflectOn.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"ReflectOn/Preview Content\"";
 				DEVELOPMENT_TEAM = 3D5Z4RTGYG;
 				ENABLE_PREVIEWS = YES;
@@ -494,12 +498,12 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = Deepthi.ReflectOn;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -626,6 +630,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		D85BC6F92D39ED6300E065E1 /* XCRemoteSwiftPackageReference "rive-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/rive-app/rive-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.5.7;
+			};
+		};
 		D8B69E2A2D2CC8050030FEC0 /* XCRemoteSwiftPackageReference "WebRTC" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/stasel/WebRTC";
@@ -653,6 +665,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		D85BC6FA2D39ED6300E065E1 /* RiveRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D85BC6F92D39ED6300E065E1 /* XCRemoteSwiftPackageReference "rive-ios" */;
+			productName = RiveRuntime;
+		};
 		D8B69E2B2D2CC8050030FEC0 /* WebRTC */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D8B69E2A2D2CC8050030FEC0 /* XCRemoteSwiftPackageReference "WebRTC" */;

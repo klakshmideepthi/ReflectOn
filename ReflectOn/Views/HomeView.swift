@@ -5,9 +5,6 @@ struct HomeView: View {
     @State private var showReflectionSession = false
     @StateObject private var viewModel = LoginViewModel()
     @StateObject private var webRTCService = WebRTCService()
-    @AppStorage("systemMessage") private var systemMessage = "Speak only in english.You are a helpful, witty, and friendly AI. Act like a human. Your voice and personality should be warm and engaging, with a lively and playful tone. Talk quickly."
-    @AppStorage("selectedModel") private var selectedModel = "gpt-4o-mini-realtime-preview-2024-12-17"
-    @AppStorage("selectedVoice") private var selectedVoice = "alloy"
     
     var body: some View {
         NavigationView {
@@ -28,12 +25,6 @@ struct HomeView: View {
                 // Main content
                 VStack(spacing: 32) {
                     Button(action: {
-                        // Generate key before showing reflection session
-                        webRTCService.prepareConnection(
-                            modelName: selectedModel,
-                            systemMessage: systemMessage,
-                            voice: selectedVoice
-                        )
                         showReflectionSession = true
                     }) {
                         VStack(spacing: 12) {
@@ -79,7 +70,7 @@ struct HomeView: View {
                 SettingsView(viewModel: viewModel)
             }
             .fullScreenCover(isPresented: $showReflectionSession) {
-                ContextView(webrtcService: webRTCService)
+                ContextView()
             }
         }
     }
