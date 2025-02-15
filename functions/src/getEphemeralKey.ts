@@ -57,8 +57,7 @@ export const getEphemeralKey = functions.https.onCall(async (data, context) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model,
-        voice
+        model
       })
     });
 

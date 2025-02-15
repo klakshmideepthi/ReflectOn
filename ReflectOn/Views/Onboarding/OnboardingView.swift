@@ -1,88 +1,54 @@
 import SwiftUI
 
 struct OnboardingView: View {
-    @StateObject private var viewModel = OnboardingViewModel()
-    @StateObject private var userViewModel = UserViewModel()
-    @State private var currentStep = 1
-    @AppStorage("log_status") var logStatus: Bool = false
-
+    @StateObject private var onboardingVM = OnboardingViewModel()
+    
     var body: some View {
         NavigationStack {
-            ZStack {
-                VStack(spacing: 0) {
-                    // Content Area
-                    TabView(selection: $currentStep) {
-                        FocusAreasSelectionView(currentStep: $currentStep, selectedAreas: $viewModel.selectedFocusAreas)
-                            .tag(1)
-                        
-                        AgeView(currentStep: $currentStep, age: Binding(
-                            get: { String(viewModel.age) },
-                            set: { if let age = Int($0) { viewModel.age = age } }
-                        ))
-                            .tag(2)
-                        
-                        GenderView(currentStep: $currentStep, gender: $viewModel.gender)
-                            .tag(3)
-                        
-                        ReminderSetupView(currentStep: $currentStep, reminderTime: $viewModel.reminderTime)
-                            .tag(4)
-                        
-                        PaywallView(currentStep: $currentStep)
-                            .tag(5)
-                        
-                        LoginView()
-                            .tag(6)
-                    }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
-                    .animation(.easeInOut, value: currentStep)
-                    
-                    // Bottom Button Area
-                    VStack(spacing: 8) {
-                        if let validationError = viewModel.validationError {
-                            Text(validationError)
-                                .foregroundColor(.red)
-                                .multilineTextAlignment(.center)
-                        }
-                        
-
-                        
-                        if(currentStep < 6) {
-                            Button(action: {
-                                if viewModel.canProceedFromCurrentStep(currentStep) {
-                                if currentStep < 6 {
-                                        withAnimation {
-                                            currentStep += 1
-                                        }
-                                    }
-                                }
-                            }) {
-                                Text(currentStep == 5 ? "Complete" : "Continue")
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.blue)
-                                    .cornerRadius(10)
-                            }
-                            .padding(.horizontal)
-                        }
-                    }
-                    .padding(.vertical)
-                    .background(Color(UIColor.systemBackground))
+            VStack {
+                if onboardingVM.currentStep > 2 {
+                    ProgressBar(currentStep: onboardingVM.currentStep, totalSteps: onboardingVM.totalSteps)
                 }
                 
-                if viewModel.isLoading {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
+                Spacer()
+                
+                switch onboardingVM.currentStep {
+                case 1:
+                    IntroductionView(onboardingVM: onboardingVM)
+                case 2:
+                    LoginOptionsView(onboardingVM: onboardingVM)
+                case 3:
+                    OnboardingQuestionsIntroView(onboardingVM: onboardingVM)
+                case 4:
+                    FocusAreaView(onboardingVM: onboardingVM)
+                case 5:
+                    AgeView(onboardingVM: onboardingVM)
+                case 6:
+                    GenderView(onboardingVM: onboardingVM)
+                case 7:
+                    // First baseline question
+                    BaselineQuestionsView(onboardingVM: onboardingVM, questionSet: 1)
+                case 8:
+                    // Second baseline question
+                    BaselineQuestionsView(onboardingVM: onboardingVM, questionSet: 2)
+                case 9:
+                    // Third baseline question
+                    BaselineQuestionsView(onboardingVM: onboardingVM, questionSet: 3)
+                case 10:
+                    ReminderSetupView(onboardingVM: onboardingVM)
+                case 11:
+                    PaywallView(onboardingVM: onboardingVM)
+                case 12:
+                    LoginView(onboardingVM: onboardingVM)
+                default:
+                    Text("Onboarding Complete")
+                        .onAppear {
+                            // Possibly trigger a navigation to HomeView
+                        }
                 }
             }
-            .alert("Error", isPresented: Binding(
-                get: { viewModel.error != nil },
-                set: { if !$0 { viewModel.error = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(viewModel.error?.localizedDescription ?? "An unknown error occurred")
-            }
+            .padding()
+            .navigationBarBackButtonHidden(true)
         }
     }
 }

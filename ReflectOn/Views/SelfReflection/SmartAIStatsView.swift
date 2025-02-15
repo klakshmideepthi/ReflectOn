@@ -4,6 +4,7 @@ struct SmartAIStatsView: View {
     let sessionId: String
     @StateObject private var viewModel = SmartAIStatsViewModel()
     @Environment(\.dismiss) private var dismiss
+    @State private var showFeedback = false
     
     var body: some View {
         Group {
@@ -17,12 +18,33 @@ struct SmartAIStatsView: View {
                     }
                 }
             case .insightsGenerated:
-                insightsContent
+                VStack {
+                    ScrollView {
+                        insightsContent
+                    }
+                    
+                    // Complete Session Button
+                    Button(action: {
+                        showFeedback = true
+                    }) {
+                        Text("Complete Session")
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue)
+                            .cornerRadius(10)
+                    }
+                    .padding()
+                }
             default:
                 LoadingView(message: "Processing...")
             }
         }
         .navigationTitle("Session Insights")
+        .fullScreenCover(isPresented: $showFeedback) {
+            FeedbackView(sessionId: sessionId)
+        }
         .task {
             await viewModel.loadInsights(sessionId: sessionId)
         }

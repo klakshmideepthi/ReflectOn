@@ -10,4 +10,5 @@ struct User {
     var fcmToken: String
     var subscriptionStatus: String
     var onboardingComplete: Bool
+    var coreMemories: [String]
 }

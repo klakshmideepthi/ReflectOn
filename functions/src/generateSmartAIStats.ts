@@ -76,7 +76,7 @@ export const generateSmartAIStats = functions.https.onCall(async (data, context)
 
     // Prepare prompt for GPT-4
     const prompt = {
-      model: "gpt-4",
+      model: "gpt-4o-mini",
       messages: [
         {
           role: "system",

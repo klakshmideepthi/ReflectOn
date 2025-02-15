@@ -5,20 +5,18 @@ import GoogleSignIn
 struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
     @ObservedObject var viewModel: LoginViewModel
-    @State private var showWelcomePage = false
     
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    ProfileView()
+//                    ProfileView()
                 }
                 
                 Section {
                     Button(action: {
                         Task {
                             await viewModel.signOut()
-                            showWelcomePage = true
                         }
                     }) {
                         HStack {
@@ -33,10 +31,10 @@ struct SettingsView: View {
             .navigationBarItems(trailing: Button("Close") {
                 presentationMode.wrappedValue.dismiss()
             })
-            .fullScreenCover(isPresented: $showWelcomePage) {
-                WelcomePageView()
-                    .navigationBarBackButtonHidden(true)
-            }
+            .fullScreenCover(isPresented: $viewModel.showIntroduction) {
+                IntroductionView(onboardingVM: OnboardingViewModel())
+                                .navigationBarBackButtonHidden(true)
+                        }
         }
     }
 } 

@@ -36,6 +36,7 @@ export const handleUserRecord = functions.auth.user().onCreate(async (user: User
         onboardingComplete: false,
         subscriptionStatus: "free",
         focusAreas: [],
+        coreMemories: [],
         timestamp: firestore.FieldValue.serverTimestamp(),
       });
     }

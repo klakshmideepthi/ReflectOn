@@ -51,6 +51,7 @@ export const storeOnboardingData = functions.https.onCall(async (data: Onboardin
       reminderTime: data.reminderTime,
       onboardingComplete: false,
       subscriptionStatus: "free", // Default status
+      coreMemories: [],
     }, {merge: true});
 
     // Store baseline answers in subcollection

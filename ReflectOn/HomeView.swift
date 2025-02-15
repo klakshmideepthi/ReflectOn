@@ -4,7 +4,6 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var showReflectionSession = false
     @StateObject private var viewModel = LoginViewModel()
-    @StateObject private var webRTCService = WebRTCService()
     
     var body: some View {
         NavigationView {

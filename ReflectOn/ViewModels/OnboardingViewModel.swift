@@ -1,11 +1,14 @@
 import Foundation
-import SwiftUI
+import FirebaseAuth
 import FirebaseFunctions
 
 class OnboardingViewModel: ObservableObject {
-    @Published var selectedFocusAreas: Set<String> = []
+    @Published var currentStep: Int = 1
+    @Published var completed: Bool = false
+    @Published var selectedFocusAreas: [String] = []
     @Published var age: Int = 0
     @Published var gender: String = ""
+    @Published var baselineAnswers: [String: String] = [:]
     @Published var reminderTime: Date = Date()
     @Published var isLoading: Bool = false
     @Published var error: Error?
@@ -13,70 +16,64 @@ class OnboardingViewModel: ObservableObject {
     
     private let functions = Functions.functions()
     
-    func canProceedFromCurrentStep(_ step: Int) -> Bool {
-        switch step {
-        case 1: // Focus Areas
-            if selectedFocusAreas.count != 2 {
-                validationError = "Please select exactly 2 focus areas"
-                return false
-            }
-        case 2: // Age
-            if age <= 13 || age > 99 {
-                validationError = "Please enter a valid age"
-                return false
-            }
-        case 3: // Gender
-            if gender.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                validationError = "Please enter your gender"
-                return false
-            }
-        default:
-            validationError = nil
-            return true
-        }
-        validationError = nil
-        return true
+    func goToNextStep() {
+        currentStep += 1
     }
     
-    func saveUserData(completion: @escaping (Bool) -> Void) {
-        isLoading = true
-        error = nil
+    func goToPreviousStep() {
+        if currentStep > 1 {
+            currentStep -= 1
+        }
+    }
+    
+    func storeOnboardingDataToFirestore() async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw NSError(domain: "OnboardingError",
+                         code: 0,
+                         userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
         
-        // Format the date to string (HH:mm format)
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "HH:mm"
+        // Convert Date to ISO8601 string format
+        let dateFormatter = ISO8601DateFormatter()
         let reminderTimeString = dateFormatter.string(from: reminderTime)
         
-        // Prepare data for the Cloud Function
-        let data: [String: Any] = [
-            "selectedFocusAreas": Array(selectedFocusAreas),
+        let userData: [String: Any] = [
+            "selectedFocusAreas": selectedFocusAreas,
             "age": age,
             "gender": gender,
-            "reminderTime": reminderTimeString,
-            "baselineAnswers": [:] // Empty for now, will be populated when we implement baseline questions
+            "baselineAnswers": baselineAnswers,
+            "reminderTime": reminderTimeString
         ]
         
-        // Call the Cloud Function
-        functions.httpsCallable("storeOnboardingData").call(data) { [weak self] result, error in
-            DispatchQueue.main.async {
-                self?.isLoading = false
+        
+        print("User Data", userData)
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            functions.httpsCallable("storeOnboardingData").call(userData) { [weak self] result, error in
+                guard let self = self else { return }
                 
-                if let error = error {
-                    self?.error = error
-                    completion(false)
-                    return
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    
+                    if let error = error {
+                        print("Firebase error:", error)
+                        continuation.resume(throwing: error)
+                        return
+                    }
+                    
+                    guard let data = result?.data as? [String: Any],
+                          let success = data["success"] as? Bool else {
+                        let error = NSError(domain: "",
+                                          code: -1,
+                                          userInfo: [NSLocalizedDescriptionKey: "Invalid response from server"])
+                        continuation.resume(throwing: error)
+                        return
+                    }
+                    
+                    self.completed = success
+                    continuation.resume(returning: ())
                 }
-                
-                guard let data = result?.data as? [String: Any],
-                      let success = data["success"] as? Bool else {
-                    self?.error = NSError(domain: "", code: -1, 
-                                        userInfo: [NSLocalizedDescriptionKey: "Invalid response from server"])
-                    completion(false)
-                    return
-                }
-                
-                completion(success)
             }
         }
     }
-} 
+}

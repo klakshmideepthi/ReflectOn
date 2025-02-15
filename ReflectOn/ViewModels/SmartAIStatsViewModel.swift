@@ -1,5 +1,6 @@
 import Foundation
 import FirebaseFirestore
+import FirebaseFunctions
 
 @MainActor
 class SmartAIStatsViewModel: ObservableObject {
@@ -23,37 +24,62 @@ class SmartAIStatsViewModel: ObservableObject {
         let actionable_steps: [String]
     }
     
+    func generateInsights(sessionId: String) async throws {
+        try await Functions.functions().httpsCallable("generateSmartAIStats").call([
+            "sessionId": sessionId
+        ])
+    }
+    
     func loadInsights(sessionId: String) async {
         isLoading = true
-        defer { isLoading = false }
         
         do {
-            // Listen for real-time updates to the session
+            // First generate the insights
+            try await generateInsights(sessionId: sessionId)
+            
+            // Then start listening for updates
             db.collection("sessions").document(sessionId)
-                .addSnapshotListener { [weak self] snapshot, error in
-                    guard let self = self,
-                          let data = snapshot?.data(),
-                          error == nil else { return }
-                    
-                    // Update status
-                    if let statusStr = data["status"] as? String,
-                       let status = SessionStatus(rawValue: statusStr) {
-                        self.sessionStatus = status
+                .addSnapshotListener { [weak self] documentSnapshot, error in
+                    guard let document = documentSnapshot else {
+                        print("Error fetching document: \(error?.localizedDescription ?? "Unknown error")")
+                        return
                     }
                     
-                    // Update insights when available
-                    if let insightsData = data["insights"] as? [String: Any] {
+                    guard let data = document.data() else {
+                        print("Document data was empty")
+                        return
+                    }
+                    
+                    // Update session status
+                    if let statusString = data["status"] as? String,
+                       let status = SessionStatus(rawValue: statusString) {
+                        self?.sessionStatus = status
+                    }
+                    
+                    // If insights are available and status is completed, update the UI
+                    if let insights = data["insights"] as? [String: Any],
+                       self?.sessionStatus == .insightsGenerated {
                         do {
-                            let jsonData = try JSONSerialization.data(withJSONObject: insightsData)
-                            self.insights = try JSONDecoder().decode(SmartAIStats.self, from: jsonData)
+                            let jsonData = try JSONSerialization.data(withJSONObject: insights)
+                            let decodedInsights = try JSONDecoder().decode(SmartAIStats.self, from: jsonData)
+                            self?.insights = decodedInsights
+                            self?.isLoading = false
                         } catch {
-                            self.error = error
+                            self?.error = error
+                            self?.isLoading = false
                         }
                     }
+                    
+                    // Handle error state
+                    if self?.sessionStatus == .insightsGenerationFailed {
+                        self?.error = NSError(domain: "", code: -1,
+                                            userInfo: [NSLocalizedDescriptionKey: "Failed to generate insights"])
+                        self?.isLoading = false
+                    }
                 }
-            
         } catch {
             self.error = error
+            self.isLoading = false
         }
     }
-} 
+}

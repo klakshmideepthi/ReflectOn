@@ -1,140 +1,91 @@
 import SwiftUI
-import GoogleSignIn
-import GoogleSignInSwift
-import Firebase
 import AuthenticationServices
 
+/// A view that appears after the paywall. Allows the user to sign in with Apple or Google.
 struct LoginView: View {
-    @StateObject private var onboardingViewModel = OnboardingViewModel()
-    @StateObject private var viewModel = LoginViewModel()
-    @StateObject private var userViewModel = UserViewModel()
-    @State private var isLoggedIn = false
-    @State private var needsOnboarding = false
-    @Environment(\.colorScheme) var colorScheme
+    
+    @StateObject private var loginVM = LoginViewModel()
+    
+    /// Reference your Onboarding data if you want to store it after login
+    @ObservedObject var onboardingVM: OnboardingViewModel
+    
+    /// Navigation
+    @Environment(\.dismiss) private var dismiss
+    @State private var navigateToHome: Bool = false
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
-                Text("Log In")
+                
+                Text("Sign In or Create an Account")
                     .font(.title)
-                    .fontWeight(.semibold)
+                    .padding(.top, 40)
                 
-                Spacer()
-                
-                VStack(spacing: 16) {
-                    // Apple Sign In Button
-                    SignInWithAppleButton(
-                        .signIn,
-                        onRequest: { request in
-                            viewModel.handleSignInWithAppleRequest(request)
-                        },
-                        onCompletion: { result in
-                            viewModel.handleSignInWithAppleCompletion(result)
-                            if viewModel.logStatus {
-                                checkOnboardingStatus()
-                            }
-                        }
-                    )
-                    .frame(height: 44)
-                    .padding(.horizontal)
-                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-                                        
-                    
-                    // Google Sign In Button
-                    Button(action: {
-                        Task {
-                            if let clientID = FirebaseApp.app()?.options.clientID {
-                                let config = GIDConfiguration(clientID: clientID)
-                                GIDSignIn.sharedInstance.configuration = config
-                                
-                                do {
-                                    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                                          let window = windowScene.windows.first,
-                                          let rootViewController = window.rootViewController else {
-                                        return
-                                    }
-                                    
-                                    let signInResult = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
-                                    try await viewModel.logGoogleUser(user: signInResult.user)
-                                    if viewModel.logStatus {
-                                        checkOnboardingStatus()
-                                    }
-                                } catch {
-                                    print("Google Sign In Error:", error.localizedDescription)
-                                }
-                            }
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "g.circle")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 20, height: 20)
-                            
-                            Text("Sign in with Google")
-                                .font(.headline)
-                        }
-                        .frame(height: 44)
-                        .frame(maxWidth: .infinity)
-                        .background(colorScheme == .dark ? .white : .black)
-                        .foregroundStyle(colorScheme == .dark ? .black : .white)
-                        .cornerRadius(8)
-                        .padding()
+                // Sign in with Apple
+                SignInWithAppleButton(.signIn, onRequest: { request in
+                    loginVM.handleSignInWithAppleRequest(request)
+                },
+                onCompletion: { result in
+                    Task {
+                        await loginVM.signInWithApple(onboardingVM : onboardingVM,result: result)
                     }
+                })
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 45)
+                .cornerRadius(8)
+                .padding(.horizontal, 50)
+                
+                // Sign in with Google
+                Button {
+                    Task {
+                        await loginVM.signInWithGoogle(onboardingVM : onboardingVM)
+                    }
+                } label: {
+                    HStack {
+                        Image("googleLogo") // Provide a Google logo asset
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                        Text("Sign in with Google")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 45)
+                }
+                .buttonStyle(.bordered)
+                .padding(.horizontal, 50)
+                
+                if let errorMessage = loginVM.errorMessage {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .padding(.top, 8)
                 }
                 
                 Spacer()
+                
+                // For demonstration: a skip button
+                Button("Skip for Now") {
+                    dismiss() // or navigate to Home
+                }
+                .padding(.bottom, 40)
             }
-            .padding(.vertical, 32)
-            .navigationDestination(isPresented: $needsOnboarding) {
-                OnboardingView()
-                    .navigationBarBackButtonHidden(true)
-            }
-            .navigationDestination(isPresented: $isLoggedIn) {
+            .navigationDestination(isPresented: $navigateToHome) {
+                // Navigate to HomeView
                 HomeView()
                     .navigationBarBackButtonHidden(true)
             }
-            .alert(viewModel.errorMessage, isPresented: $viewModel.showError) {}
-            .onAppear {
-                if viewModel.logStatus {
-                    checkOnboardingStatus()
+            .onReceive(loginVM.$shouldNavigateToHome) { value in
+                if value == true {
+                    navigateToHome = true
                 }
             }
         }
-    }
-    
-    private func checkOnboardingStatus() {
-        onboardingViewModel.saveUserData { success in
-            if success {
-                Task {
-                    // Update onboarding complete status
-                    userViewModel.updateUserData(field: "onboardingComplete", value: true)
+        .overlay(
+            Group {
+                if loginVM.isLoading {
+                    ProgressView("Signing in...")
+                        .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                        .scaleEffect(1.2)
                 }
             }
-        }
-        Task {
-            await userViewModel.fetchUserData()
-            if let user = userViewModel.user {
-                withAnimation {
-                    if user.onboardingComplete {
-                        isLoggedIn = true
-                    } else {
-                        needsOnboarding = true
-                    }
-                }
-            } else {
-                withAnimation {
-                    needsOnboarding = true
-                }
-            }
-        }
-    }
-}
-
-extension UIApplication {
-    func rootController() -> UIViewController {
-        guard let window = connectedScenes.first as? UIWindowScene else { return .init() }
-        guard let viewController = window.windows.first?.rootViewController else { return .init() }
-        return viewController
+        )
     }
 }

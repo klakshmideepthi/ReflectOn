@@ -8,13 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		D85BC6FB2D39ED6300E065E1 /* RiveRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = D85BC6FA2D39ED6300E065E1 /* RiveRuntime */; };
-		D8B69E2C2D2CC8050030FEC0 /* WebRTC in Frameworks */ = {isa = PBXBuildFile; productRef = D8B69E2B2D2CC8050030FEC0 /* WebRTC */; };
+		D85BC9442D3FE8DF00E065E1 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = D85BC9432D3FE8DF00E065E1 /* FirebaseMessaging */; };
 		D8D8727A2D2AF6DA00ED37D0 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = D8D872792D2AF6DA00ED37D0 /* GoogleSignIn */; };
 		D8D8727C2D2AF6DA00ED37D0 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = D8D8727B2D2AF6DA00ED37D0 /* GoogleSignInSwift */; };
 		D8D8727E2D2AF6E700ED37D0 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = D8D8727D2D2AF6E700ED37D0 /* FirebaseAppCheck */; };
 		D8D872802D2AF6E700ED37D0 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D8D8727F2D2AF6E700ED37D0 /* FirebaseAuth */; };
 		D8D872822D2AF6E700ED37D0 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = D8D872812D2AF6E700ED37D0 /* FirebaseFirestore */; };
 		D8D872842D2AF6F000ED37D0 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = D8D872832D2AF6F000ED37D0 /* FirebaseFunctions */; };
+		D8DBE3FC2D4FE1410015D74C /* OpenAI in Frameworks */ = {isa = PBXBuildFile; productRef = D8DBE3FB2D4FE1410015D74C /* OpenAI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,6 +52,11 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		D85BC9B02D40317000E065E1 /* docs */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = docs;
+			sourceTree = "<group>";
+		};
 		D8D872392D2AF4AC00ED37D0 /* ReflectOn */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -76,13 +82,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D85BC9442D3FE8DF00E065E1 /* FirebaseMessaging in Frameworks */,
 				D8D8727A2D2AF6DA00ED37D0 /* GoogleSignIn in Frameworks */,
 				D8D8727E2D2AF6E700ED37D0 /* FirebaseAppCheck in Frameworks */,
 				D8D8727C2D2AF6DA00ED37D0 /* GoogleSignInSwift in Frameworks */,
-				D8B69E2C2D2CC8050030FEC0 /* WebRTC in Frameworks */,
 				D8D872842D2AF6F000ED37D0 /* FirebaseFunctions in Frameworks */,
 				D85BC6FB2D39ED6300E065E1 /* RiveRuntime in Frameworks */,
 				D8D872822D2AF6E700ED37D0 /* FirebaseFirestore in Frameworks */,
+				D8DBE3FC2D4FE1410015D74C /* OpenAI in Frameworks */,
 				D8D872802D2AF6E700ED37D0 /* FirebaseAuth in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -112,6 +119,7 @@
 				D8D872542D2AF4AE00ED37D0 /* ReflectOnUITests */,
 				D8D872782D2AF6D900ED37D0 /* Frameworks */,
 				D8D872382D2AF4AC00ED37D0 /* Products */,
+				D85BC9B02D40317000E065E1 /* docs */,
 			);
 			sourceTree = "<group>";
 		};
@@ -148,6 +156,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				D85BC9B02D40317000E065E1 /* docs */,
 				D8D872392D2AF4AC00ED37D0 /* ReflectOn */,
 			);
 			name = ReflectOn;
@@ -158,8 +167,9 @@
 				D8D8727F2D2AF6E700ED37D0 /* FirebaseAuth */,
 				D8D872812D2AF6E700ED37D0 /* FirebaseFirestore */,
 				D8D872832D2AF6F000ED37D0 /* FirebaseFunctions */,
-				D8B69E2B2D2CC8050030FEC0 /* WebRTC */,
 				D85BC6FA2D39ED6300E065E1 /* RiveRuntime */,
+				D85BC9432D3FE8DF00E065E1 /* FirebaseMessaging */,
+				D8DBE3FB2D4FE1410015D74C /* OpenAI */,
 			);
 			productName = ReflectOn;
 			productReference = D8D872372D2AF4AC00ED37D0 /* ReflectOn.app */;
@@ -246,8 +256,8 @@
 			packageReferences = (
 				D8D872762D2AF6A600ED37D0 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				D8D872772D2AF6B900ED37D0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
-				D8B69E2A2D2CC8050030FEC0 /* XCRemoteSwiftPackageReference "WebRTC" */,
 				D85BC6F92D39ED6300E065E1 /* XCRemoteSwiftPackageReference "rive-ios" */,
+				D8DBE3AA2D4FDE850015D74C /* XCRemoteSwiftPackageReference "swift-realtime-openai" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D8D872382D2AF4AC00ED37D0 /* Products */;
@@ -638,14 +648,6 @@
 				minimumVersion = 6.5.7;
 			};
 		};
-		D8B69E2A2D2CC8050030FEC0 /* XCRemoteSwiftPackageReference "WebRTC" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/stasel/WebRTC";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 130.0.0;
-			};
-		};
 		D8D872762D2AF6A600ED37D0 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
@@ -662,6 +664,14 @@
 				minimumVersion = 11.6.0;
 			};
 		};
+		D8DBE3AA2D4FDE850015D74C /* XCRemoteSwiftPackageReference "swift-realtime-openai" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/m1guelpf/swift-realtime-openai";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -670,10 +680,10 @@
 			package = D85BC6F92D39ED6300E065E1 /* XCRemoteSwiftPackageReference "rive-ios" */;
 			productName = RiveRuntime;
 		};
-		D8B69E2B2D2CC8050030FEC0 /* WebRTC */ = {
+		D85BC9432D3FE8DF00E065E1 /* FirebaseMessaging */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = D8B69E2A2D2CC8050030FEC0 /* XCRemoteSwiftPackageReference "WebRTC" */;
-			productName = WebRTC;
+			package = D8D872772D2AF6B900ED37D0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
 		};
 		D8D872792D2AF6DA00ED37D0 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -704,6 +714,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D8D872772D2AF6B900ED37D0 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFunctions;
+		};
+		D8DBE3FB2D4FE1410015D74C /* OpenAI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D8DBE3AA2D4FDE850015D74C /* XCRemoteSwiftPackageReference "swift-realtime-openai" */;
+			productName = OpenAI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

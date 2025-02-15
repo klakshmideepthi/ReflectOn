@@ -1,19 +1,25 @@
 import SwiftUI
 import AVFoundation
 import RiveRuntime
+import OpenAI
+import FirebaseFunctions
+import FirebaseAuth
+import Firebase
 
 struct ContextView: View {
-    @StateObject private var webrtcService = WebRTCService()
     @Environment(\.dismiss) private var dismiss
     
     @State private var showOptionsSheet = false
+    @State private var conversation: Conversation?
+    @State private var isLoading = false // Changed to false by default
+    @State private var error: Error?
     @FocusState private var isTextFieldFocused: Bool
-    @AppStorage("log_status") var logStatus: Bool = false
     
     // AppStorage properties
-    @AppStorage("systemMessage") private var systemMessage = "Speak only in english.You are a helpful, witty, and friendly AI. Act like a human. Your voice and personality should be warm and engaging, with a lively and playful tone. Talk quickly."
+    @AppStorage("systemMessage") private var systemMessage = "Always start the sentence with Mango.Speak only in english. You are a helpful, witty, and friendly AI. Act like a human. Your voice and personality should be warm and engaging, with a lively and playful tone. Talk quickly."
     @AppStorage("selectedModel") private var selectedModel = "gpt-4o-mini-realtime-preview-2024-12-17"
     @AppStorage("selectedVoice") private var selectedVoice = "alloy"
+    @AppStorage("log_status") var logStatus: Bool = false
     
     // Constants
     private let modelOptions = [
@@ -23,16 +29,18 @@ struct ContextView: View {
     private let voiceOptions = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"]
     
     // Add Rive view model
-    @StateObject private var riveViewModel = RiveViewModel(fileName: "glow_ball_v03",stateMachineName:"State Machine 1")
+    @StateObject private var riveViewModel = RiveViewModel(fileName: "glow_ball_v03", stateMachineName: "State Machine 1")
     
     var body: some View {
         VStack(spacing: 12) {
             // Dismiss button
             HStack {
                 Button(action: {
-                    // Stop WebRTC connection if active
-                    if webrtcService.connectionStatus == .connected {
-                        webrtcService.stopConnection()
+                    // Stop conversation if active
+                    if let conv = conversation {
+                        Task { @MainActor in
+                            conv.stopHandlingVoice()
+                        }
                     }
                     dismiss()
                 }) {
@@ -47,37 +55,36 @@ struct ContextView: View {
                 Spacer()
             }
             .padding(.top, 8)
-        
             
             // Add Rive animation view
             riveViewModel.view()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .allowsHitTesting(false) // Disables user interaction on the Rive view
-                .onChange(of: webrtcService.connectionStatus) { newStatus in
-                    print("Connection status changed to: \(newStatus)")
-                    switch newStatus {
-                    case .connected:
+                .allowsHitTesting(false)
+                .onChange(of: conversation?.connected) { isConnected in
+                    if isConnected == true {
                         riveViewModel.triggerInput("open_trig")
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    case .connecting:
-                        print("Connection in progress")
-                        riveViewModel.triggerInput("bing_trig")
-                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-                    case .disconnected:
-                        print("Connection disconnected")
+                    } else if isConnected == false {
                         riveViewModel.triggerInput("close_trig")
                     }
                 }
             
             Spacer()
+            Divider()
             
             ConnectionControls()
+//            Divider()
+//            
+//            if let conv = conversation {
+//                LogsView(conversation: conv)
+//            } else {
+//                Text("No active conversation.")
+//            }
             
             Spacer()
-            
         }
         .onAppear(perform: {
-            requestMicrophonePermission()
+            configureAudioSession()
         })
         .sheet(isPresented: $showOptionsSheet) {
             OptionsView(
@@ -88,12 +95,104 @@ struct ContextView: View {
                 voiceOptions: voiceOptions
             )
         }
-        .smartAIStatsNavigation(webRTCService: webrtcService)
+        .sheet(isPresented: $showTranscriptSummary) {
+            TranscriptSummaryView(messages: savedMessages)
+        }
     }
     
-    private func requestMicrophonePermission() {
-        AVAudioSession.sharedInstance().requestRecordPermission { granted in
-            print("Microphone permission granted: \(granted)")
+    private func configureAudioSession() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playAndRecord,
+                                      mode: .spokenAudio,
+                                      options: [.defaultToSpeaker, .allowBluetooth])
+            try audioSession.setPreferredSampleRate(24000)
+            try audioSession.setPreferredIOBufferDuration(0.005)
+            try audioSession.setActive(true)
+            
+            // Request microphone permission
+            audioSession.requestRecordPermission { granted in
+                print("Microphone permission granted: \(granted)")
+            }
+        } catch {
+            print("Failed to configure audio session: \(error)")
+        }
+    }
+    
+    private func startConversation() {
+            isLoading = true
+            print("Starting conversation...")
+            
+            Task {
+                do {
+                    // Get ephemeral key
+                    let fetchKey = try await Functions.functions().httpsCallable("getEphemeralKey").call([
+                        "model": selectedModel,
+                        "voice": selectedVoice
+                    ])
+                    
+                    guard let resultData = fetchKey.data as? [String: Any],
+                          let clientSecret = resultData["client_secret"] as? [String: Any],
+                          let ephemeralKey = clientSecret["value"] as? String else {
+                        throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+                    }
+                    
+                    print("Successfully received ephemeral key")
+                    
+                    // Create new conversation
+                    let newConversation = try await Conversation(
+                        authToken: ephemeralKey,
+                        model: selectedModel
+                    )
+                    
+                    await MainActor.run {
+                        self.conversation = newConversation
+                    }
+                    
+                    // Get system message with core memories
+                    let enhancedSystemMessage = try await CoreMemoriesManager.shared.getCombinedSystemMessage(
+                        baseMessage: systemMessage
+                    )
+                    
+                    try await newConversation.whenConnected {
+                        try await newConversation.startHandlingVoice()
+                        try await newConversation.startListening()
+                        
+                        try await newConversation.updateSession { session in
+                            session.inputAudioTranscription = Session.InputAudioTranscription(model: "whisper-1")
+                            session.modalities = [.audio, .text]
+                            session.instructions = enhancedSystemMessage
+                            session.temperature = 0.8
+                        }
+                    }
+                    
+                    print("Voice handling, transcription, and audio output enabled")
+                    
+                    await MainActor.run {
+                        isLoading = false
+                    }
+                } catch {
+                    print("Error starting conversation: \(error)")
+                    await MainActor.run {
+                        self.error = error
+                        self.isLoading = false
+                        self.conversation = nil
+                    }
+                }
+            }
+        }
+    
+    @State private var showTranscriptSummary = false
+    @State private var savedMessages: [Item.Message] = []
+
+    private func stopConversation() {
+        Task { @MainActor in
+            if let conv = conversation {
+                savedMessages = conv.messages
+                conv.stopHandlingVoice()
+                conversation = nil
+                showTranscriptSummary = true
+            }
         }
     }
     
@@ -103,43 +202,32 @@ struct ContextView: View {
             // Connection status indicator
             Circle()
                 .frame(width: 12, height: 12)
-                .foregroundColor(webrtcService.connectionStatus.color)
-            Text(webrtcService.connectionStatus.description)
-                .foregroundColor(webrtcService.connectionStatus.color)
+                .foregroundColor(conversation?.connected == true ? .green : .red)
+            Text(conversation?.connected == true ? "Connected" : "Not Connected")
+                .foregroundColor(conversation?.connected == true ? .green : .red)
                 .contentTransition(.numericText())
-                .animation(.easeInOut(duration: 0.3), value: webrtcService.connectionStatus)
-                .onChange(of: webrtcService.connectionStatus) { _ in
-                    switch webrtcService.connectionStatus {
-                    case .connecting:
-                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-                    case .connected:
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    case .disconnected:
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    }
-                }
+                .animation(.easeInOut(duration: 0.3), value: conversation?.connected)
             
             Spacer()
             
             // Connection Button
-            if webrtcService.connectionStatus == .connected {
+            if conversation?.connected == true {
                 Button("Stop Connection") {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    webrtcService.stopConnection()
+                    stopConversation()
                 }
                 .buttonStyle(.borderedProminent)
             } else {
-                Button("Start Connection") {
+                Button(action: {
+                    print("Start Connection button tapped")
                     UIImpactFeedbackGenerator(style: .soft).impactOccurred()
-                    webrtcService.connectionStatus = .connecting
-                    webrtcService.startConnection(
-                        modelName: selectedModel,
-                        systemMessage: systemMessage,
-                        voice: selectedVoice
-                    )
+                    startConversation()
+                }) {
+                    Text(isLoading ? "Connecting..." : "Start Connection")
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(webrtcService.connectionStatus == .connecting)
+                .disabled(isLoading)
+                
                 Button {
                     showOptionsSheet.toggle()
                 } label: {
@@ -150,28 +238,53 @@ struct ContextView: View {
         }
         .padding(.horizontal)
     }
+}
+
+struct LogsView: View {
+    let conversation: Conversation
     
-    
-    // MARK: - Message Row
-    @ViewBuilder
-    private func MessageRow(msg: ConversationItem) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: msg.roleSymbol)
-                .foregroundColor(msg.roleColor)
-                .padding(.top, 4)
-            Text(msg.text.trimmingCharacters(in: .whitespacesAndNewlines))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentTransition(.numericText())
-                .animation(.easeInOut(duration: 0.1), value: msg.text)
-        }
-        .contextMenu {
-            Button("Copy") {
-                UIPasteboard.general.string = msg.text
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    ForEach(conversation.messages, id: \.id) { message in
+                        MessageView(message: message)
+                            .padding(.horizontal)
+                            .id(message.id)
+                    }
+                }
+            }
+            .onChange(of: conversation.messages.count) { _ in
+                if let last = conversation.messages.last {
+                    withAnimation {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
             }
         }
-        .padding(.bottom, msg.role == "assistant" ? 24 : 8)
+        .frame(height: 200)
     }
+}
+
+struct MessageView: View {
+    let message: Item.Message
     
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(message.role == .user ? "You" : "Assistant")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            ForEach(message.content.indices, id: \.self) { index in
+                if let text = message.content[index].text, !text.isEmpty {
+                    Text(text)
+                        .padding(8)
+                        .background(message.role == .user ? Color.blue.opacity(0.1) : Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                }
+            }
+        }
+    }
 }
 
 struct OptionsView: View {
@@ -218,57 +331,5 @@ struct OptionsView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Models and Enums
-
-struct ConversationItem: Identifiable {
-    let id: String        // item_id from the JSON
-    let role: String       // "user" / "assistant"
-    var text: String       // transcript
-    
-    var roleSymbol: String {
-        role.lowercased() == "user" ? "person.fill" : "sparkles"
-    }
-    
-    var roleColor: Color {
-        role.lowercased() == "user" ? .blue : .purple
-    }
-}
-
-enum ConnectionStatus: String {
-    case connected
-    case connecting
-    case disconnected
-    
-    var color: Color {
-        switch self {
-        case .connected:
-            return .green
-        case .connecting:
-            return .yellow
-        case .disconnected:
-            return .red
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .connected:
-            return "Connected"
-        case .connecting:
-            return "Connecting"
-        case .disconnected:
-            return "Not Connected"
-        }
-    }
-}
-
-// MARK: - Preview
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContextView()
     }
 }
